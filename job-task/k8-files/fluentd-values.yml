@@ -1,0 +1,8 @@
+cloudWatch:
+  enabled: true
+  region: us-west-1
+  logGroupName: /eks/fluentd/logs
+  logStreamName: fluentd
+  autoCreateLogGroup: true
+
+# helm install fluentd fluent/fluentd -f fluentd-values.yaml --namespace kube-system
