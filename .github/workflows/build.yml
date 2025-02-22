@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -11,6 +12,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Setup Terraform  
+        uses: hashicorp/setup-terraform@v2  
+        with:  
+          terraform_version: latest
       
       - name: Set up AWS CLI
         uses: aws-actions/configure-aws-credentials@v1
@@ -18,6 +24,9 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
+
+      - name: checking terraform version
+        run: terraform version
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -36,6 +45,27 @@ jobs:
           curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
           chmod 700 get_helm.sh
           ./get_helm.sh
+
+      - name: Terraform init
+        run: cd ./job-task/INFRA-SETUP-EKS-Terraform && terraform init
+          
+      - name: Terraform plan  
+        id: plan
+        run: |
+          cd ./job-task/INFRA-SETUP-EKS-Terraform && terraform plan -no-color -input=false -out=tfplan
+          echo "changes=$(terraform show -no-color tfplan | grep -q 'No changes.' && echo 'false' || echo 'true')" >> $GITHUB_OUTPUT  
+        env:  
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}  
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}  
+          AWS_REGION: ${{ secrets.AWS_REGION }}  
+
+      - name: Terraform Apply  
+        run: cd ./job-task/INFRA-SETUP-EKS-Terraform && terraform apply --auto-approve
+        if: steps.plan.outputs.changes == 'true' 
+        env:  
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}  
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}  
+          AWS_REGION: ${{ secrets.AWS_REGION }}  
 
   deploy:
     needs: build
